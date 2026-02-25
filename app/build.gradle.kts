@@ -104,8 +104,8 @@ dependencies {
     implementation("com.mikepenz:multiplatform-markdown-renderer:0.39.2")
     implementation("com.mikepenz:multiplatform-markdown-renderer-m3:0.39.2")
     implementation("com.mikepenz:multiplatform-markdown-renderer-coil3:0.39.2")
-    implementation("io.coil-kt.coil3:coil-compose:3.3.0")
-    implementation("io.coil-kt.coil3:coil-network-okhttp:3.3.0")
+    implementation("io.coil-kt.coil3:coil-compose:3.4.0")
+    implementation("io.coil-kt.coil3:coil-network-okhttp:3.4.0")
 
     implementation("androidx.room:room-runtime:2.8.4")
     implementation("androidx.room:room-ktx:2.8.4")
