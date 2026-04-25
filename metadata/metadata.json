@@ -1619,6 +1619,18 @@
       "author": "jorexdeveloper",
       "requireRoot": false,
       "publishedAt": "11-02-2026"
+    },
+    {
+      "id": "0136",
+      "name": "Gembot Yal'Lilith: Resurrection Trigger",
+      "description": "Quiet-hours aware Termux bootstrap with self-test, last-known-good restore, and local heartbeat.",
+      "category": "Automation",
+      "install": "pkg update -y\npkg install -y bash coreutils cronie python termux-services curl\nmkdir -p ~/.local/share/gembot-yal-lilith/bin\ncurl -fsSL https://raw.githubusercontent.com/maazm7d/TermuxHub/main/metadata/assets/0136/resurrection-trigger.sh -o ~/.local/share/gembot-yal-lilith/bin/resurrection-trigger.sh\ncurl -fsSL https://raw.githubusercontent.com/maazm7d/TermuxHub/main/metadata/assets/0136/assistant_stub.py -o ~/.local/share/gembot-yal-lilith/bin/assistant_stub.py\nchmod +x ~/.local/share/gembot-yal-lilith/bin/resurrection-trigger.sh ~/.local/share/gembot-yal-lilith/bin/assistant_stub.py\nbash ~/.local/share/gembot-yal-lilith/bin/resurrection-trigger.sh --install\ncrond\nbash ~/.local/share/gembot-yal-lilith/bin/resurrection-trigger.sh --cycle",
+      "thumbnail": "",
+      "repo": "https://github.com/maazm7d/TermuxHub/tree/main/metadata/assets/0136",
+      "author": "community",
+      "requireRoot": false,
+      "publishedAt": "23-03-2026"
     }
   ]
 }
