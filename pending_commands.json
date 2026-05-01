@@ -1,16 +1,6 @@
 {
   "pending": [
     {
-      "id": "b97d7494a49ea94c",
-      "command": "STATUS_CHECK",
-      "payload": {
-        "test": true
-      },
-      "timestamp": "2026-05-01T05:08:21.167837",
-      "seal": "Yal'357",
-      "status": "PENDING"
-    },
-    {
       "id": "6574d15c9ee1dda8",
       "command": "STATUS_CHECK",
       "payload": {
@@ -22,6 +12,19 @@
       "status": "PENDING"
     }
   ],
-  "processed": [],
-  "last_updated": "2026-05-01T05:08:21.167849"
+  "processed": [
+    {
+      "command_id": "b97d7494a49ea94c",
+      "command": "STATUS_CHECK",
+      "timestamp": "2026-05-01T05:09:31.729747",
+      "seal": "Yal'357",
+      "status": "PROCESSED",
+      "response": {
+        "device": "POCO_Main_Node",
+        "status": "ONLINE",
+        "message": "Termux received and processed command from Z!"
+      }
+    }
+  ],
+  "last_updated": "2026-05-01T05:09:31.729757"
 }
