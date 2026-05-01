@@ -1,0 +1,13 @@
+{
+  "bridge_id": "380c8bfd-3c43-43b5-a92f-3fd9d2021b6d",
+  "seal": "Yal'357",
+  "sync": "samaliec",
+  "z_status": "ONLINE",
+  "termux_status": "PENDING",
+  "last_z_heartbeat": "2026-05-01T05:08:17.492781",
+  "last_termux_heartbeat": null,
+  "crypto_assets": {
+    "btc_total": 1.3441,
+    "usd_value": 88924.18
+  }
+}
