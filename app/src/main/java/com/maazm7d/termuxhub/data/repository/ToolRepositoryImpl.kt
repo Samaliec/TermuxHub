@@ -1,175 +1,150 @@
 package com.maazm7d.termuxhub.data.repository
 
-import android.content.Context
-import com.maazm7d.termuxhub.data.local.ToolDao
 import com.maazm7d.termuxhub.data.local.entities.ToolEntity
-import com.maazm7d.termuxhub.data.remote.MetadataClient
-import com.maazm7d.termuxhub.data.remote.dto.MetadataDto
+import com.maazm7d.termuxhub.data.mapper.toDetailDomain
+import com.maazm7d.termuxhub.data.mapper.toEntity
 import com.maazm7d.termuxhub.data.remote.dto.RepoStatsDto
-import com.maazm7d.termuxhub.data.remote.dto.ToolDto
+import com.maazm7d.termuxhub.data.source.local.LocalDataSource
+import com.maazm7d.termuxhub.data.source.remote.RemoteDataSource
 import com.maazm7d.termuxhub.domain.model.ToolDetails
-import com.squareup.moshi.Moshi
-import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
-import kotlinx.coroutines.Dispatchers
+import com.maazm7d.termuxhub.domain.repository.ToolRepository
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.withContext
-import java.io.BufferedReader
-import java.io.InputStreamReader
+import timber.log.Timber
 import javax.inject.Inject
 
 class ToolRepositoryImpl @Inject constructor(
-    private val toolDao: ToolDao,
-    private val metadataClient: MetadataClient,
-    private val appContext: Context,
+    private val localDataSource: LocalDataSource,
+    private val remoteDataSource: RemoteDataSource,
     private val assetsFileName: String = "metadata/metadata.json"
 ) : ToolRepository {
 
-    private val moshi = Moshi.Builder()
-        .add(KotlinJsonAdapterFactory())
-        .build()
-
     override fun observeAll(): Flow<List<ToolEntity>> =
-        toolDao.getAllToolsFlow()
+        localDataSource.getAllToolsFlow()
 
     override fun observeFavorites(): Flow<List<ToolEntity>> =
-        toolDao.getFavoritesFlow()
+        localDataSource.getFavoritesFlow()
 
     override suspend fun getToolById(id: String): ToolEntity? =
-        toolDao.getToolById(id)
+        localDataSource.getToolById(id)
 
     override suspend fun setFavorite(toolId: String, isFav: Boolean) {
-        val current = toolDao.getToolById(toolId) ?: return
-        toolDao.update(current.copy(isFavorite = isFav))
+        try {
+            val current = localDataSource.getToolById(toolId) ?: return
+            localDataSource.updateTool(current.copy(isFavorite = isFav))
+        } catch (e: Exception) {
+            Timber.e(e, "Error setting favorite for tool: $toolId")
+        }
     }
 
     override suspend fun refreshFromRemote(): Boolean {
         return try {
-            val response = metadataClient.fetchMetadata()
-            if (response.isSuccessful && response.body() != null) {
-                val repoStats = fetchRepoStats()
-                response.body()!!.tools.forEach { dto ->
-                    val existing = toolDao.getToolById(dto.id)
-                    val entity = dto.toEntity(existing, repoStats)
-                    if (entity != null) toolDao.insert(entity)
+            kotlinx.coroutines.coroutineScope {
+                val metadataDeferred = async { remoteDataSource.fetchMetadata() }
+                val repoStatsDeferred = async { fetchRepoStats() }
+                val starsDeferred = async { fetchStars() }
+
+                val response = metadataDeferred.await()
+                val repoStats = repoStatsDeferred.await()
+                val starsMap = starsDeferred.await()
+
+                if (response.isSuccessful && response.body() != null) {
+                    val metadata = response.body()!!
+                    val existingTools = localDataSource.getAllTools().associateBy { it.id }
+                    val entities = metadata.tools.mapNotNull { dto ->
+                        val existing = existingTools[dto.id]
+                        dto.toEntity(existing, repoStats)?.copy(
+                            stars = starsMap[dto.id] ?: existing?.stars ?: 0
+                        )
+                    }
+                    if (entities.isNotEmpty()) {
+                        localDataSource.insertTools(entities)
+                    }
+                    true
+                } else {
+                    loadFromAssets()
                 }
-                applyStars()
-                true
-            } else {
-                loadFromAssets()
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            Timber.e(e, "Error refreshing tools from remote")
             loadFromAssets()
         }
     }
 
-    override suspend fun fetchStars(): Map<String, Int> {
-        return try {
-            val resp = metadataClient.fetchStars()
-            if (resp.isSuccessful) resp.body()?.stars ?: emptyMap()
-            else emptyMap()
-        } catch (e: Exception) {
-            e.printStackTrace()
-            emptyMap()
-        }
+    override suspend fun fetchStars(): Map<String, Int> = runCatching {
+        val resp = remoteDataSource.fetchStars()
+        if (resp.isSuccessful) resp.body()?.stars ?: emptyMap()
+        else emptyMap()
+    }.getOrElse { e ->
+        Timber.e(e, "Error fetching stars")
+        emptyMap()
     }
 
-    private suspend fun fetchRepoStats(): Map<String, RepoStatsDto> {
-        return try {
-            val resp = metadataClient.fetchRepoStats()
-            if (resp.isSuccessful) resp.body()?.stats ?: emptyMap()
-            else emptyMap()
-        } catch (_: Exception) {
-            emptyMap()
-        }
+    private suspend fun fetchRepoStats(): Map<String, RepoStatsDto> = runCatching {
+        val resp = remoteDataSource.fetchRepoStats()
+        if (resp.isSuccessful) resp.body()?.stats ?: emptyMap()
+        else emptyMap()
+    }.getOrElse { e ->
+        Timber.e(e, "Error fetching repo stats")
+        emptyMap()
     }
 
     private suspend fun applyStars() {
         val starsMap = fetchStars()
-        starsMap.forEach { (toolId, starCount) ->
-            val tool = toolDao.getToolById(toolId)
-            if (tool != null && tool.stars != starCount) {
-                toolDao.update(tool.copy(stars = starCount))
+        if (starsMap.isEmpty()) return
+
+        val allTools = localDataSource.getAllTools()
+        val toolsToUpdate = allTools.mapNotNull { tool ->
+            val remoteStars = starsMap[tool.id]
+            if (remoteStars != null && tool.stars != remoteStars) {
+                tool.copy(stars = remoteStars)
+            } else {
+                null
             }
+        }
+
+        if (toolsToUpdate.isNotEmpty()) {
+            localDataSource.updateTools(toolsToUpdate)
         }
     }
 
-    private suspend fun loadFromAssets(): Boolean = withContext(Dispatchers.IO) {
-        try {
+    private suspend fun loadFromAssets(): Boolean {
+        return try {
             val repoStats = fetchRepoStats()
-            val input = appContext.assets.open(assetsFileName)
-            val text = BufferedReader(InputStreamReader(input)).use { it.readText() }
-            val adapter = moshi.adapter(MetadataDto::class.java)
-            val dto = adapter.fromJson(text)
+            val dto = localDataSource.loadMetadataFromAssets(assetsFileName)
+            val existingTools = localDataSource.getAllTools().associateBy { it.id }
 
-            dto?.tools?.forEach { t ->
-                val existing = toolDao.getToolById(t.id)
-                val entity = t.toEntity(existing, repoStats)
-                if (entity != null) toolDao.insert(entity)
+            val entities = dto?.tools?.mapNotNull { t ->
+                val existing = existingTools[t.id]
+                t.toEntity(existing, repoStats)
+            } ?: emptyList()
+
+            if (entities.isNotEmpty()) {
+                localDataSource.insertTools(entities)
             }
 
             applyStars()
             true
         } catch (e: Exception) {
-            e.printStackTrace()
+            Timber.e(e, "Error loading tools from assets")
             false
         }
     }
 
-    private fun ToolDto.toEntity(
-        existing: ToolEntity? = null,
-        repoStats: Map<String, RepoStatsDto>
-    ): ToolEntity? {
-        if (id.isBlank() || name.isBlank()) return null
-
-        val stats = repoStats[id]
-
-        return ToolEntity(
-            id = id,
-            name = name,
-            description = description ?: "",
-            category = category ?: "Uncategorized",
-            installCommand = install,
-            repoUrl = repo,
-            author = author ?: "",
-            requireRoot = requireRoot ?: false,
-            thumbnail = thumbnail,
-            forks = stats?.forks ?: existing?.forks ?: 0,
-            issues = stats?.issues ?: existing?.issues ?: 0,
-            pullRequests = stats?.pullRequests ?: existing?.pullRequests ?: 0,
-            license = stats?.license ?: existing?.license,
-            stars = stats?.stars ?: existing?.stars ?: 0,
-            updatedAt = stats?.lastUpdated
-                ?: existing?.updatedAt
-                ?: System.currentTimeMillis(),
-            isFavorite = existing?.isFavorite ?: false,
-            publishedAt = publishedAt
-        )
-    }
-
     override suspend fun getToolDetails(id: String): ToolDetails? {
-        val tool = toolDao.getToolById(id) ?: return null
-
-        val readmeText = try {
-            val resp = metadataClient.fetchReadme(id)
-            if (resp.isSuccessful) resp.body() ?: "" else ""
-        } catch (_: Exception) {
-            ""
+        val tool = localDataSource.getToolById(id) ?: return null
+        var readme = tool.readme
+        if (readme.isNullOrBlank()) {
+            readme = try {
+                remoteDataSource.fetchReadme(id).body() ?: ""
+            } catch (e: Exception) {
+                Timber.e(e, "Error fetching readme for $id")
+                ""
+            }
+            if (readme.isNotBlank()) {
+                localDataSource.updateTool(tool.copy(readme = readme))
+            }
         }
-
-        return ToolDetails(
-            id = tool.id,
-            title = tool.name,
-            description = tool.description,
-            readme = readmeText,
-            installCommands = tool.installCommand ?: "",
-            repoUrl = tool.repoUrl,
-            stars = tool.stars,
-            forks = tool.forks,
-            issues = tool.issues,
-            pullRequests = tool.pullRequests,
-            license = tool.license,
-            lastUpdated = tool.updatedAt
-        )
+        return tool.toDetailDomain(readme)
     }
 }

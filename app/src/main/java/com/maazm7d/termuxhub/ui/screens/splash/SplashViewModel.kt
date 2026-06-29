@@ -2,7 +2,7 @@ package com.maazm7d.termuxhub.ui.screens.splash
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.maazm7d.termuxhub.data.repository.ToolRepository
+import com.maazm7d.termuxhub.domain.usecase.RefreshToolsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,7 +13,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class SplashViewModel @Inject constructor(
-    private val repository: ToolRepository
+    private val refreshToolsUseCase: RefreshToolsUseCase
 ) : ViewModel() {
 
     private val _ready = MutableStateFlow(false)
@@ -25,7 +25,7 @@ class SplashViewModel @Inject constructor(
             val start = System.currentTimeMillis()
 
             try {
-                repository.refreshFromRemote()
+                refreshToolsUseCase()
             } catch (_: Exception) {}
 
             val elapsed = System.currentTimeMillis() - start

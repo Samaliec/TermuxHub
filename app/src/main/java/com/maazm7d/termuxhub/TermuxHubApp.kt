@@ -2,7 +2,9 @@ package com.maazm7d.termuxhub
 
 import android.app.Application
 import androidx.work.Configuration
+import com.maazm7d.termuxhub.BuildConfig
 import dagger.hilt.android.HiltAndroidApp
+import timber.log.Timber
 
 @HiltAndroidApp
 class TermuxHubApp : Application(), Configuration.Provider {
@@ -14,5 +16,8 @@ class TermuxHubApp : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
+        if (BuildConfig.DEBUG) {
+            Timber.plant(Timber.DebugTree())
+        }
     }
 }

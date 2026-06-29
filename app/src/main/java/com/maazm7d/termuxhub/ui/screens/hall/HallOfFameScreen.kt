@@ -18,15 +18,14 @@ import com.maazm7d.termuxhub.ui.components.HallOfFameCard
 fun HallOfFameScreen(
     viewModel: HallOfFameViewModel = hiltViewModel()
 ) {
-    val members by viewModel.members
-    val isLoading by viewModel.isLoading
+    val uiState by viewModel.uiState.collectAsState()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 16.dp)
     ) {
-
+        // Header
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.Center,
@@ -38,9 +37,7 @@ fun HallOfFameScreen(
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(22.dp)
             )
-
             Spacer(modifier = Modifier.width(8.dp))
-
             Text(
                 text = "Hall of Fame",
                 style = MaterialTheme.typography.headlineSmall
@@ -48,7 +45,6 @@ fun HallOfFameScreen(
         }
 
         Spacer(modifier = Modifier.height(8.dp))
-
         Text(
             text = "Contributors & Members",
             style = MaterialTheme.typography.bodyMedium,
@@ -56,21 +52,16 @@ fun HallOfFameScreen(
             modifier = Modifier.fillMaxWidth(),
             textAlign = TextAlign.Center
         )
-
         Spacer(modifier = Modifier.height(10.dp))
-
         HorizontalDivider(
-            modifier = Modifier
-                .width(120.dp)
-                .align(Alignment.CenterHorizontally),
+            modifier = Modifier.width(120.dp).align(Alignment.CenterHorizontally),
             thickness = 1.dp,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
         )
-
         Spacer(modifier = Modifier.height(20.dp))
 
-        when {
-            isLoading -> {
+        when (uiState) {
+            is HallOfFameUiState.Loading -> {
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
@@ -78,26 +69,35 @@ fun HallOfFameScreen(
                     CircularProgressIndicator()
                 }
             }
-
-            members.isEmpty() -> {
+            is HallOfFameUiState.Success -> {
+                val members = (uiState as HallOfFameUiState.Success).members
+                if (members.isEmpty()) {
+                    Text(
+                        text = "No members found.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center
+                    )
+                } else {
+                    Column(
+                        modifier = Modifier.verticalScroll(rememberScrollState())
+                    ) {
+                        members.forEach { member ->
+                            HallOfFameCard(member)
+                            Spacer(modifier = Modifier.height(12.dp))
+                        }
+                    }
+                }
+            }
+            is HallOfFameUiState.Error -> {
                 Text(
-                    text = "No internet connection.\nPlease connect to the internet to load Hall of Fame.",
+                    text = (uiState as HallOfFameUiState.Error).message,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.fillMaxWidth(),
                     textAlign = TextAlign.Center
                 )
-            }
-
-            else -> {
-                Column(
-                    modifier = Modifier.verticalScroll(rememberScrollState())
-                ) {
-                    members.forEach { member ->
-                        HallOfFameCard(member)
-                        Spacer(modifier = Modifier.height(12.dp))
-                    }
-                }
             }
         }
     }

@@ -2,38 +2,36 @@ package com.maazm7d.termuxhub.ui.screens.saved
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.maazm7d.termuxhub.data.repository.ToolRepository
-import com.maazm7d.termuxhub.domain.mapper.toDomain
-import com.maazm7d.termuxhub.domain.model.Tool
+import com.maazm7d.termuxhub.domain.usecase.GetSavedToolsUseCase
+import com.maazm7d.termuxhub.domain.usecase.ToggleFavoriteUseCase
+import com.maazm7d.termuxhub.utils.UiState
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+data class SavedUiState(
+    val tools: List<com.maazm7d.termuxhub.domain.model.Tool> = emptyList()
+)
+
 @HiltViewModel
 class SavedViewModel @Inject constructor(
-    private val repository: ToolRepository
+    private val getSavedToolsUseCase: GetSavedToolsUseCase,
+    private val toggleFavoriteUseCase: ToggleFavoriteUseCase
 ) : ViewModel() {
 
-    val savedTools: StateFlow<List<Tool>> =
-        repository.observeFavorites()
-            .map { toolEntities ->
-                toolEntities.map { toolEntity ->
-                    toolEntity.toDomain()
-                }
-            }
-            .stateIn(
-                scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(5000),
-                initialValue = emptyList()
-            )
+    val uiState: StateFlow<UiState<SavedUiState>> = getSavedToolsUseCase()
+        .map { tools -> UiState.Success(SavedUiState(tools)) as UiState<SavedUiState> }
+        .catch { e -> emit(UiState.Error(e.message ?: "Failed to load saved tools")) }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = UiState.Loading
+        )
 
-    fun removeTool(tool: Tool) {
+    fun unsave(toolId: String) {
         viewModelScope.launch {
-            repository.setFavorite(tool.id, false)
+            toggleFavoriteUseCase(toolId)
         }
     }
 }

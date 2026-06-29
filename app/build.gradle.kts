@@ -56,6 +56,7 @@ android {
     }
 
     buildFeatures {
+        buildConfig = true
         compose = true
     }
 
@@ -104,14 +105,16 @@ dependencies {
     implementation("com.mikepenz:multiplatform-markdown-renderer:0.39.2")
     implementation("com.mikepenz:multiplatform-markdown-renderer-m3:0.39.2")
     implementation("com.mikepenz:multiplatform-markdown-renderer-coil3:0.39.2")
-    implementation("io.coil-kt.coil3:coil-compose:3.3.0")
-    implementation("io.coil-kt.coil3:coil-network-okhttp:3.3.0")
+    implementation("io.coil-kt.coil3:coil-compose:3.4.0")
+    implementation("io.coil-kt.coil3:coil-network-okhttp:3.4.0")
 
     implementation("androidx.room:room-runtime:2.8.4")
     implementation("androidx.room:room-ktx:2.8.4")
     ksp("androidx.room:room-compiler:2.8.4")
 
     implementation("androidx.work:work-runtime-ktx:2.11.1")
+
+    implementation("com.jakewharton.timber:timber:5.0.1")
 
     implementation("com.google.dagger:hilt-android:2.59.2")
     ksp("com.google.dagger:hilt-compiler:2.59.2")
@@ -120,4 +123,9 @@ dependencies {
     ksp("androidx.hilt:hilt-compiler:1.3.0")
 
     implementation("androidx.core:core-splashscreen:1.2.0")
+
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("io.mockk:mockk:1.13.17")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
+    testImplementation("app.cash.turbine:turbine:1.2.0")
 }
