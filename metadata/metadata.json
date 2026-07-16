@@ -2075,6 +2075,18 @@
       "author": "stp-ngnm",
       "requireRoot": false,
       "publishedAt": "10-05-2026"
+    },
+    {
+      "id": "0174",
+      "name": "TyplOf",
+      "description": "Real-time typing trainer with smart scoring, multi-language support and progress charts for Termux",
+      "category": "Utilities & Dev",
+      "install": "pkg update && pkg upgrade -y\npkg install python git -y\ngit clone https://github.com/ncjcjfvkkvkv-create/typlof-app.git\ncd typlof-app\npip install flask\npython app.py",
+      "thumbnail": "",
+      "repo": "https://github.com/ncjcjfvkkvkv-create/typlof-app",
+      "author": "ncjcjfvkkvkv-create",
+      "requireRoot": false,
+      "publishedAt": "04-07-2026"
     }
   ]
 }
