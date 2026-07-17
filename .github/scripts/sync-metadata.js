@@ -5,6 +5,7 @@ import https from "https";
 const METADATA_PATH = "metadata/metadata.json";
 const STARS_PATH = "metadata/stars.json";
 const STATS_PATH = "metadata/repo_stats.json";
+const DEAD_REPOS_PATH = "metadata/dead_repos.json";
 const README_DIR = "metadata/readme";
 const README_SIZE_LIMIT = 100 * 1024;
 const TOKEN = process.env.GITHUB_TOKEN;
@@ -145,25 +146,68 @@ async function fetchPullRequestCount(owner, repo) {
   return count;
 }
 
+async function validateRepositories(metadata) {
+  info("Starting repository validation");
+  const dead = [];
+  const valid = [];
+
+  for (const tool of metadata.tools) {
+    const repo = parseRepo(tool.repo);
+    if (!repo) {
+      dead.push({ id: tool.id, name: tool.name, reason: "Invalid repo URL" });
+      continue;
+    }
+
+    try {
+      await github(`/repos/${repo.owner}/${repo.repo}`);
+      valid.push(tool);
+    } catch (e) {
+      dead.push({
+        id: tool.id,
+        name: tool.name,
+        repo: tool.repo,
+        reason: "404 Not Found or Access Denied"
+      });
+      warn(`DEAD REPO: [${tool.id}] ${tool.name} - ${tool.repo}`);
+    }
+  }
+
+  info(`Validation complete: ${valid.length} valid, ${dead.length} dead`);
+  return { valid, dead };
+}
+
 async function main() {
   info("Starting metadata fetch");
   const metadata = readJson(METADATA_PATH);
   ensureDir(README_DIR);
 
-  const starsMap = {};
-  const statsMap = {};
   const today = new Date().toISOString().slice(0, 10);
 
-  for (const tool of metadata.tools) {
+  // Validate repositories first
+  const { valid: validTools, dead: deadRepos } = await validateRepositories(metadata);
+
+  // Save dead repos report
+  if (deadRepos.length > 0) {
+    fs.writeFileSync(
+      DEAD_REPOS_PATH,
+      JSON.stringify({ lastChecked: today, count: deadRepos.length, deadRepos }, null, 2)
+    );
+    info(`Saved ${deadRepos.length} dead repositories to ${DEAD_REPOS_PATH}`);
+  }
+
+  const starsMap = {};
+  const statsMap = {};
+
+  // Process only valid tools
+  for (const tool of validTools) {
     info(`Processing tool: ${tool.id}`);
     const repo = parseRepo(tool.repo);
-    if (!repo) continue;
 
     let repoData;
     try {
       repoData = await github(`/repos/${repo.owner}/${repo.repo}`);
     } catch (e) {
-      warn(`Failed to fetch repo: ${repo.owner}/${repo.repo}`);
+      warn(`Failed to fetch repo metadata: ${repo.owner}/${repo.repo}`);
       continue;
     }
 
