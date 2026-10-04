@@ -66,8 +66,8 @@ android {
         }
     }
 
-dependenciesInfo {      
-        includeInApk = false      
+    dependenciesInfo {
+        includeInApk = false
         includeInBundle = false
     }
 }
